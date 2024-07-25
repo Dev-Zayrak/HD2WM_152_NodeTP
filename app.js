@@ -29,12 +29,16 @@ mongoose.connect('mongodb://localhost:27017/db_article')
 const Article = mongoose.model('Article', {uid: String, title: String, content: String, author: String}, 'articles')
 //==============BDD==============//
 
-
+//Création d'une fonction qui permet faire le message d'erreur
+function responseService(response, code, message, data){
+    //Message d'erreur générique
+    return response.json({ code: code, message : message, data : data});
+}
 
 
 app.get('/articles', async (request, response) =>{
     const articles = await Article.find()
-    return response.json(articles)     
+    return responseService(response, '200', 'La liste des articles a été récupérés avec succès', articles)   
 })
 
 
@@ -45,9 +49,10 @@ app.get('/article/:id', async (request, response)=> {
     //select un article
     const articleTrouver = await Article.findOne({uid : articleId})
 
-    if(articleTrouver) response.json(articleTrouver)
-        else response.send(`l'article ayant l'ID : ${articleId} n'existe pas`)
+    if(articleTrouver) return responseService(response, '200', `L'article a été récupéré avec succès`, articleTrouver) 
+        else return responseService(response, '702', `Impossible de récupérer un article avec l'UID ${articleId} | Null`, articleTrouver)
 })
+
 
 
 app.post('/save-article', async (request, response)=>{
@@ -55,6 +60,11 @@ app.post('/save-article', async (request, response)=>{
     let nouvelleArticle = request.body
     let articleTrouver = null
     const id = request.body.id
+
+    //controler si le titre existe déjà
+    let titreDejaPresent = await Article.findOne({title : nouvelleArticle.title})
+
+
 
 
     //controler si l'article possède un ID et du coup on modifie
@@ -64,16 +74,24 @@ app.post('/save-article', async (request, response)=>{
         if(!articleTrouver){
             return response.json(`article non présent en BDD id : ${id}`)
         }
+        if(titreDejaPresent){
+            return responseService(response, '701', `Impossible de modifier un article si un autre article possède un titre similaire`, null)
+        }
         await Article.updateOne({uid : id}, {$set: request.body})
-        return response.json(`L'article id : ${articleTrouver.uid} à été mise à jour`)
+        articleApresModif = await Article.findOne({uid : id})
+        return responseService(response, '200', `Article modifié avec succès`, articleApresModif)
     }
  
+    //controler si le titre existe déjà
+    if(titreDejaPresent){
+        return responseService(response, '701', `Impossible d'ajouter un article avec un titre déjà existant`, null)
+    }
     //sinon on créer l'article
     // généré uid
     nouvelleArticle.uid = uuidv4()
     const creationArticle = await Article.create(nouvelleArticle)
     await creationArticle.save()
-    return response.json(creationArticle)
+    return responseService(response, '200', `Article ajouté avec succès`, creationArticle)
 })
 
 
@@ -84,10 +102,10 @@ app.delete('/article/:id', async (request, response)=> {
     const articleTrouver = await Article.findOne({uid : articleId})
 
     if(!articleTrouver){
-    return response.json(`Article non trouvé`)
+        return responseService(response, '702', `Impossible de supprimer un article dont l'UID n'existe pas`, null)
     }
     await articleTrouver.deleteOne()
-    return response.json(`article avec l'ID ${articleId} est supprimé`)
+    return responseService(response, '200', `L'article ${articleId} a été supprimé avec succès`, articleTrouver)
   }) 
 
 
