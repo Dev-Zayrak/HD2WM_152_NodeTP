@@ -29,7 +29,7 @@ mongoose.connect('mongodb://localhost:27017/db_article')
 const Article = mongoose.model('Article', {uid: String, title: String, content: String, author: String}, 'articles')
 //==============BDD==============//
 
-//Création d'une fonction qui permet faire le message d'erreur
+//Fonction utilitaire pour retourner une structure de réponse métier
 function responseService(response, code, message, data){
     //Message d'erreur générique
     return response.json({ code: code, message : message, data : data});
@@ -50,7 +50,7 @@ app.get('/article/:id', async (request, response)=> {
     const articleTrouver = await Article.findOne({uid : articleId})
 
     if(articleTrouver) return responseService(response, '200', `L'article a été récupéré avec succès`, articleTrouver) 
-        else return responseService(response, '702', `Impossible de récupérer un article avec l'UID ${articleId} | Null`, articleTrouver)
+        else return responseService(response, '702', `Impossible de récupérer un article avec l'UID ${articleId}`, articleTrouver)
 })
 
 
@@ -61,8 +61,8 @@ app.post('/save-article', async (request, response)=>{
     let articleTrouver = null
     const id = request.body.id
 
-    //controler si le titre existe déjà
-    let titreDejaPresent = await Article.findOne({title : nouvelleArticle.title})
+    //controler si le titre existe déjà -- $ne = not equals
+    let titreDejaPresentupdate = await Article.findOne({title : nouvelleArticle.title, $ne : {uid : nouvelleArticle.id}})
 
 
 
@@ -74,7 +74,7 @@ app.post('/save-article', async (request, response)=>{
         if(!articleTrouver){
             return response.json(`article non présent en BDD id : ${id}`)
         }
-        if(titreDejaPresent){
+        if(titreDejaPresentupdate){
             return responseService(response, '701', `Impossible de modifier un article si un autre article possède un titre similaire`, null)
         }
         await Article.updateOne({uid : id}, {$set: request.body})
@@ -83,6 +83,7 @@ app.post('/save-article', async (request, response)=>{
     }
  
     //controler si le titre existe déjà
+    let titreDejaPresent = await Article.findOne({title : nouvelleArticle.title})
     if(titreDejaPresent){
         return responseService(response, '701', `Impossible d'ajouter un article avec un titre déjà existant`, null)
     }
